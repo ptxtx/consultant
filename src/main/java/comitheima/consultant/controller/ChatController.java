@@ -23,7 +23,7 @@ public class ChatController {
 //    public String chat(String msg) {
 //        return consultantService.chat(msg);
 //    }
-    public Flux<String> chat(String msg) {
-        return consultantService.chat(msg);
+    public Flux<String> chat(String memoryId,String msg) {
+        return consultantService.chat(memoryId,msg);
     }
 }
