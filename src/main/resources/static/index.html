@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 智能顾问</title>
+    <title>AI 智能志愿填报顾问</title>
     <style>
         * {
             box-sizing: border-box;
@@ -20,7 +20,7 @@
         }
         .chat-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 850px;
             height: 85vh;
             background-color: #ffffff;
             border-radius: 12px;
@@ -36,7 +36,35 @@
             font-size: 18px;
             font-weight: bold;
             display: flex;
+            justify-content: space-between;
             align-items: center;
+        }
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-badge {
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: normal;
+        }
+        .new-chat-btn {
+            background-color: #52c41a;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: normal;
+        }
+        .new-chat-btn:hover {
+            background-color: #389e0d;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .chat-messages {
             flex: 1;
@@ -48,7 +76,7 @@
             margin-bottom: 15px;
             display: flex;
             flex-direction: column;
-            max-width: 80%;
+            max-width: 85%;
         }
         .message.user {
             margin-left: auto;
@@ -59,10 +87,10 @@
             align-items: flex-start;
         }
         .message-content {
-            padding: 10px 16px;
+            padding: 12px 16px;
             border-radius: 8px;
             font-size: 15px;
-            line-height: 1.5;
+            line-height: 1.6;
             word-break: break-all;
             white-space: pre-wrap;
         }
@@ -84,7 +112,7 @@
         }
         .chat-input {
             flex: 1;
-            height: 40px;
+            height: 42px;
             padding: 8px 15px;
             border: 1px solid #d9d9d9;
             border-radius: 6px;
@@ -97,7 +125,7 @@
         }
         .send-btn {
             margin-left: 12px;
-            padding: 0 20px;
+            padding: 0 22px;
             background-color: #2f54eb;
             color: white;
             border: none;
@@ -118,14 +146,20 @@
 <body>
 
 <div class="chat-container">
-    <div class="chat-header">AI 智能顾问 (DeepSeek)</div>
+    <div class="chat-header">
+        <div class="header-title">
+            <span>传智志愿填报 AI 顾问</span>
+            <span id="sessionBadge" class="status-badge">会话ID: 加载中...</span>
+        </div>
+        <button id="newChatBtn" class="new-chat-btn">+ 新建会话</button>
+    </div>
     <div class="chat-messages" id="chatMessages">
         <div class="message ai">
-            <div class="message-content">你好！我是你的AI顾问，有什么我可以帮你的吗？</div>
+            <div class="message-content">你好！我是传智教育智能志愿填报咨询师。请问有什么我可以帮您的？</div>
         </div>
     </div>
     <div class="chat-input-area">
-        <input type="text" id="chatInput" class="chat-input" placeholder="输入您的问题，按回车发送..." autocomplete="off">
+        <input type="text" id="chatInput" class="chat-input" placeholder="输入高考志愿相关问题，按回车发送..." autocomplete="off">
         <button id="sendBtn" class="send-btn">发送</button>
     </div>
 </div>
@@ -134,13 +168,43 @@
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
+    const newChatBtn = document.getElementById('newChatBtn');
+    const sessionBadge = document.getElementById('sessionBadge');
 
-    // 自动滚动到最底部
+    // 核心改造：引入客户端 sessionId 机制
+    let sessionId = '';
+
+    // 初始化或获取当前会话ID
+    function initSession(forceNew = false) {
+        if (forceNew) {
+            // 新增会话：生成全新UUID并存入本地
+            sessionId = crypto.randomUUID();
+            localStorage.setItem('CHAT_SESSION_ID', sessionId);
+
+            // 清空前端聊天看板，保留一条欢迎语
+            chatMessages.innerHTML = `
+                <div class="message ai">
+                    <div class="message-content">新会话已开启！请输入您的问题。</div>
+                </div>
+            `;
+        } else {
+            // 读取现有会话，若不存在则新建
+            sessionId = localStorage.getItem('CHAT_SESSION_ID');
+            if (!sessionId) {
+                sessionId = crypto.randomUUID();
+                localStorage.setItem('CHAT_SESSION_ID', sessionId);
+            }
+        }
+        // 更新顶部的 Session 编号显示（取前8位缩略显示）
+        sessionBadge.textContent = `会话ID: ${sessionId.substring(0, 8)}`;
+    }
+
+    // 滚动置底
     function scrollToBottom() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // 创建消息DOM
+    // 渲染消息DOM
     function appendMessage(sender, text) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
@@ -152,40 +216,29 @@
         messageDiv.appendChild(contentDiv);
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
-        return contentDiv; // 返回内容区的引用以便后续追加流式文本
+        return contentDiv;
     }
 
-    // 发送消息核心逻辑（处理流式Flux返回）
+    // 发送流式消息
     async function sendMessage() {
         const messageText = chatInput.value.trim();
         if (!messageText) return;
 
-        // 1. 禁用输入与按钮
         chatInput.value = '';
         chatInput.disabled = true;
         sendBtn.disabled = true;
 
-        // 2. 渲染用户消息
         appendMessage('user', messageText);
-
-        // 3. 创建AI响应占位消息
         const aiContentElement = appendMessage('ai', '正在思考...');
 
         try {
-            // 4. 发起Fetch请求调用后端的 /chat 接口
-            // 你的后端通过请求参数接收 msg: chat(String msg)
-            const response = await fetch(`/chat?msg=${encodeURIComponent(messageText)}`, {
-                method: 'GET'
-            });
+            // 发送请求时同时携带 msg 和唯一的 sessionId 传给后端
+            const url = `/chat?msg=${encodeURIComponent(messageText)}&memoryId=${encodeURIComponent(sessionId)}`;
+            const response = await fetch(url, { method: 'GET' });
 
-            if (!response.ok) {
-                throw new Error('网络请求错误');
-            }
+            if (!response.ok) throw new Error('网络异常');
 
-            // 清空"正在思考..."提示，准备接收真正的流式文本
             aiContentElement.textContent = '';
-
-            // 5. 读取流式数据 (ReadableStream)
             const reader = response.body.getReader();
             const decoder = new TextDecoder('utf-8');
 
@@ -193,31 +246,37 @@
                 const { value, done } = await reader.read();
                 if (done) break;
 
-                // 解码当前数据块并追加到AI文本框内
                 const chunk = decoder.decode(value, { stream: true });
                 aiContentElement.textContent += chunk;
                 scrollToBottom();
             }
 
         } catch (error) {
-            console.error('Error:', error);
-            aiContentElement.textContent = '❌ 出错啦，请稍后再试。';
+            console.error(error);
+            aiContentElement.textContent = '❌ 服务器开小差了，请稍后再试。';
             aiContentElement.style.color = 'red';
         } finally {
-            // 6. 恢复输入状态
             chatInput.disabled = false;
             sendBtn.disabled = false;
             chatInput.focus();
         }
     }
 
-    // 绑定事件
+    // 事件监听绑定
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    // 点击“新建会话”触发隔离逻辑
+    newChatBtn.addEventListener('click', () => {
+        if (confirm('确定要结束当前讨论，开启一个全新的独立会话吗？')) {
+            initSession(true);
         }
     });
+
+    // 页面初次加载初始化
+    initSession();
 </script>
 
 </body>
