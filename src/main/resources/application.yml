@@ -12,6 +12,13 @@ langchain4j:
       model-name: deepseek-v4-flash
       log-requests: true
       log-responses: true
+      #embedding model配置
+      #向量数据库配置
+  community:
+    redis:
+      host: localhost
+      port: 6399
+
 logging:
   level:
     dev.langchain4j: debug
