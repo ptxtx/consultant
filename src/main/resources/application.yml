@@ -14,10 +14,15 @@ langchain4j:
       log-responses: true
       #embedding model配置
       #向量数据库配置
-  community:
-    redis:
-      host: localhost
-      port: 6399
+#  community:
+#    redis:
+#      host: localhost
+#      port: 6399
+#      dimension: 1024
+#  ollama:
+#    embedding-model:
+#      base-url: http://localhost:11434
+#      model-name: bge-m3
 
 logging:
   level:
